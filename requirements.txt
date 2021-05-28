@@ -1,2 +1,4 @@
 pytgcalls
 ffmpeg-python
+instaloader
+natsort
