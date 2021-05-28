@@ -2,3 +2,12 @@ pytgcalls
 ffmpeg-python
 instaloader
 natsort
+imutils
+numpy
+opencv-python
+PyPDF2
+scikit-image
+google_trans_new
+PyDictionary
+asyncurban
+pylast
