@@ -1,17 +1,23 @@
 # ported from oub-remix to USERGE-X by AshSTR/ashwinstr
 
+import json
+import os
+
+import aiohttp
 import lyricsgenius
 import requests
-import aiohttp
-import json
-
 from bs4 import BeautifulSoup
 from googlesearch import search
-from userge import Message, userge, Config
+
+from userge import Message, userge
 from userge.utils import post_to_telegraph
 
-if Config.GENIUS is not None:
-    genius = lyricsgenius.Genius(Config.GENIUS)
+GENIUS = os.environ.get("GENIUS")
+
+CHANNEL = userge.getCLogger(__name__)
+
+if GENIUS is not None:
+    genius = lyricsgenius.Genius(GENIUS)
 
 
 @userge.on_cmd(
@@ -19,21 +25,44 @@ if Config.GENIUS is not None:
     about={
         "header": "Lyrics using Genius API",
         "description": "Song lyrics from Genius.com",
-        "flags": {"-t": "With telegra.ph link..."},
+        "flags": {
+            "-t": "With telegra.ph link...",
+            "-pre": "telegr.ph link with preview",
+            "-s": "Search song names...",
+        },
         "usage": "{tr}glyrics [Artist name] - [Song name]",
         "examples": "{tr}glyrics Eminem - Higher",
     },
 )
 async def lyrics(message: Message):
+    """Lyrics from genius.com"""
     song = message.filtered_input_str or message.reply_to_message.text
     flag = message.flags
     if not song:
-        await message.err("Search song lyrics without song name?")
+        await message.err("Search song lyrics without song name?", del_in=5)
         return
-    if Config.GENIUS is None:
-        await message.err("Provide 'Genius access token' as `GENIUS` to config vars...\nGet it from docs.genius.com")
+    if GENIUS is None:
+        await message.err(
+            "Provide 'Genius access token' as `GENIUS` to config vars...\nGet it from docs.genius.com...",
+            del_in=5,
+        )
         return
-    
+    if len(flag) > 1:
+        await message.edit("Only one flag at a time please...", del_in=5)
+        return
+    if "-s" in flag:
+        songs = genius.search_songs(song)
+        await message.edit(f"Searching songs matching <b>{song}</b>...")
+        number = 0
+        s_list = []
+        hits = songs["hits"]
+        for one in hits:
+            s_list.append(f'◾️ <code>{hits[number]["result"]["full_title"]}</code>')
+            number += 1
+        s_list = "\n".join(s_list)
+        await message.edit(f"Songs matching [<b>{song}</b>]:\n\n" f"{s_list}")
+        return
+
     to_search = song + "genius lyrics"
     gen_surl = list(search(to_search, num=1, stop=1))[0]
     gen_page = requests.get(gen_surl)
@@ -67,12 +96,13 @@ async def lyrics(message: Message):
     for s in name_s:
         s = s.capitalize()
         song_s.append(s)
-    song = " ".join(song_s) 
+    song = " ".join(song_s)
     if artist == "":
         title = song
     else:
         title = f"{artist} - {song}"
     await message.edit(f"Searching lyrics for **{title}** on Genius...`")
+    dis_pre = True
     try:
         lyr = genius.search_song(song, artist)
     except Exception:
@@ -89,17 +119,27 @@ async def lyrics(message: Message):
             lyric = await result.text()
         lyr = json.loads(lyric)
         lyr = lyr["lyrics"]
+        if not lyr:
+            await message.edit(
+                f"Sorry, couldn't find lyrics for <code>{title}</code>...", del_in=5
+            )
+            return
         lyrics = f"\n{lyr}"
         lyrics += f"\n\n<b>Written by:</b> <code>{writers}</code>"
         lyrics += f"\n<b>Source:</b> <code>genius.com</code>"
         lyrics = lyrics.replace("[", "<b>[").replace("]", "]</b>")
         full_lyr = f"Lyrics for **{title}** by Genius.com...\n\n{lyrics}"
-        if len(full_lyr) <= 4096 and "-t" not in flag:
+        if len(full_lyr) <= 4096 and "-t" not in flag and "-pre" not in flag:
             await message.edit(full_lyr)
         else:
+            if "-pre" in flag:
+                dis_pre = False
             lyrics = lyrics.replace("\n", "<br>")
             link = post_to_telegraph(f"Lyrics for {title}...", lyrics)
-            await message.edit(f"Lyrics for **{title}** by Genius.com...\n[Link]({link})", disable_web_page_preview=True)
+            await message.edit(
+                f"Lyrics for [<b>{title}</b>]({link}) by genius.com...",
+                disable_web_page_preview=dis_pre,
+            )
         return
     if lyr is None:
         await message.edit(f"Couldn't find `{title}` on Genius...")
@@ -111,9 +151,14 @@ async def lyrics(message: Message):
     lyrics = lyrics.replace("[", "<b>[")
     lyrics = lyrics.replace("]", "]</b>")
     lyr_msg = f"Lyrics for <b>{title}</b>...\n\n{lyrics}"
-    if len(lyr_msg) <= 4096 and "-t" not in flag:
+    if len(lyr_msg) <= 4096 and "-t" not in flag and "-pre" not in flag:
         await message.edit(f"{lyr_msg}")
     else:
-        lyrics = lyrics.replace("\n", "<br>") 
+        if "-pre" in flag:
+            dis_pre = False
+        lyrics = lyrics.replace("\n", "<br>")
         link = post_to_telegraph(f"Lyrics for {title}...", lyrics)
-        await message.edit(f"Lyrics for **{title}** by Genius.com...\n[Link]({link})", disable_web_page_preview=True)
+        await message.edit(
+            f"Lyrics for [<b>{title}</b>]({link}) by genius.com...",
+            disable_web_page_preview=dis_pre,
+        )
