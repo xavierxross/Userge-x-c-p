@@ -11,3 +11,4 @@ google_trans_new
 PyDictionary
 asyncurban
 pylast
+lyricsgenius
