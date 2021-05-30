@@ -30,7 +30,7 @@ def ri(img):
 async def user():
     data = await get_collection("CONFIGS").find_one({"_id": "SHOW_LASTFM"})
     user_ = await userge.get_me()
-    return f"[{user_.first_name}]({du}{os.environ.get("LASTFM_USERNAME")})" if data and data["on"] == "Show" else f"{user_.first_name}"
+    return f"[{user_.first_name}]({du}{Malikith})" if data and data["on"] == "Show" else f"{user_.first_name}"
 
 async def resp(params: dict):
     async with aiohttp.ClientSession() as session:
