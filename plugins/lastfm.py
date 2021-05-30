@@ -46,7 +46,7 @@ async def recs(query, typ, lim):
     return res
 
 async def info(wo, query, art, tr):
-    params = {"method": f"{wo}.getInfo", "api_key": Config.LASTFM_API_KEY, "format": "json"}
+    params = {"method": f"{wo}.getInfo", "api_key": os.environ.get("LASTFM_API_KEY"), "format": "json"}
     if wo=="user":
         params['user']=query
     else:
